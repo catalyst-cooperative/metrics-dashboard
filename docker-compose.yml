@@ -1,0 +1,58 @@
+services:
+  metrics_dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metrics-dashboard
+    environment:
+      METRICS_DASHBOARD_USERNAME: ${METRICS_DASHBOARD_USERNAME-dev}
+      METRICS_DASHBOARD_PASSWORD: ${METRICS_DASHBOARD_USERNAME-dev}
+      METRICS_DASHBOARD_DB_USERNAME: ${METRICS_DASHBOARD_DB_USERNAME}
+      METRICS_DASHBOARD_DB_PASSWORD: ${METRICS_DASHBOARD_DB_PASSWORD}
+      METRICS_DASHBOARD_DB_NAME: ${METRICS_DASHBOARD_DB_NAME}
+      METRICS_DASHBOARD_DB_HOST: ${METRICS_DASHBOARD_DB_HOST-cloud_auth_proxy}
+      METRICS_DASHBOARD_DB_PORT: ${METRICS_DASHBOARD_DB_PORT-5432}
+      SECRET_KEY: bogus
+    volumes:
+      - type: bind
+        source: src/metrics_dashboard
+        target: /app/src/metrics_dashboard
+    ports:
+      - target: 8050
+        published: 8050
+  cloud_auth_proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.13.0
+    environment:
+      CLOUD_SQL_CONNECTION_NAME: ${CLOUD_SQL_CONNECTION_NAME}
+      GOOGLE_APPLICATION_CREDENTIALS: /tmp/keys/application_default_credentials.json
+    volumes:
+      - ${GCLOUD_CREDS}:/tmp/keys/application_default_credentials.json:ro
+    ports:
+      - 8082:5432
+    command: [$CLOUD_SQL_CONNECTION_NAME, "--address", "0.0.0.0"]
+
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metrics-dashboard-jupyter
+    environment:
+      METRICS_DASHBOARD_USERNAME: ${METRICS_DASHBOARD_USERNAME-dev}
+      METRICS_DASHBOARD_PASSWORD: ${METRICS_DASHBOARD_USERNAME-dev}
+      METRICS_DASHBOARD_DB_USERNAME: ${METRICS_DASHBOARD_DB_USERNAME}
+      METRICS_DASHBOARD_DB_PASSWORD: ${METRICS_DASHBOARD_DB_PASSWORD}
+      METRICS_DASHBOARD_DB_NAME: ${METRICS_DASHBOARD_DB_NAME}
+      METRICS_DASHBOARD_DB_HOST: ${METRICS_DASHBOARD_DB_HOST-cloud_auth_proxy}
+      METRICS_DASHBOARD_DB_PORT: ${METRICS_DASHBOARD_DB_PORT-5432}
+    command: "uv run jupyter notebook --allow-root --ip=0.0.0.0"
+    volumes:
+      - type: bind
+        source: src/metrics_dashboard
+        target: /app/src/metrics_dashboard
+      - type: bind
+        source: notebooks
+        target: /app/notebooks
+    ports:
+      - target: 8888
+        published: 8888
